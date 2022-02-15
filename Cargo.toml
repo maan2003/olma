@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 bumpalo = { version = "3.9.1", features = ["collections", "boxed"] }
 take_mut = "0.2.2"
+druid-shell = { path = "/home/manmeet/src/druid/druid-shell" }

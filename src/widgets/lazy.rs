@@ -23,13 +23,11 @@ impl<'a, T: 'static> CustomView<'a> for LazyView<T> {
     fn build(self) -> Box<dyn Widget<'a>> {
         // VIEW doesn't outline the data
         let view = unsafe { (self.builder)(&*(&*self.data as *const T)) };
-        Box::new(WidgetWrap::<Lazy<_>> {
-            inner: Lazy {
-                inner: view.build(),
-                data: self.data,
-                builder: self.builder,
-            },
-        })
+        Box::new(WidgetWrap::<Lazy<_>>::new(Lazy {
+            inner: view.build(),
+            data: self.data,
+            builder: self.builder,
+        }))
     }
 }
 
@@ -49,5 +47,9 @@ impl<'a, T: 'static> CustomWidget for Lazy<T> {
                 inner: this.inner.update(inner_view),
             }
         }
+    }
+
+    fn as_ui_widget<'x, 't>(this: &'t mut Self::This<'x>) -> &'t mut (dyn crate::UiWidget + 'x) {
+        todo!()
     }
 }

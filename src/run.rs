@@ -38,4 +38,3 @@ fn main() {
         // invariant: current and next will stay the same
     }
 }
-

@@ -24,13 +24,11 @@ where
     }
 
     fn build(self) -> Box<dyn Widget<'a>> {
-        Box::new(WidgetWrap::<List<_>> {
-            inner: List {
-                list: self.list,
-                child: self.child,
-                children: Vec::new(),
-            },
-        })
+        Box::new(WidgetWrap::<List<_>>::new(List {
+            list: self.list,
+            child: self.child,
+            children: Vec::new(),
+        }))
     }
 }
 
@@ -67,5 +65,9 @@ where
             child: view.child,
             children,
         }
+    }
+
+    fn as_ui_widget<'x, 't>(this: &'t mut Self::This<'x>) -> &'t mut (dyn crate::UiWidget + 'x) {
+        todo!()
     }
 }
