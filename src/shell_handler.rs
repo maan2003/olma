@@ -12,27 +12,27 @@ use druid_shell::{
 
 use super::Window;
 
-pub struct ShellHandler<T> {
+pub struct ShellHandler {
     //app: Application,
-    inner: WindowConnection<T>,
+    inner: WindowConnection,
 }
 
-enum WindowConnection<T> {
-    Waiting(AppHolder<T>),
-    Connected(Rc<RefCell<Window<T>>>),
+enum WindowConnection {
+    Waiting(AppHolder),
+    Connected(Rc<RefCell<Window>>),
     Closed,
     // a sentinel state only used during transitions
     Invalid,
 }
 
-impl<T> WindowConnection<T> {
-    fn transition(&mut self) -> WindowConnection<T> {
+impl WindowConnection {
+    fn transition(&mut self) -> WindowConnection {
         std::mem::replace(self, WindowConnection::Invalid)
     }
 }
 
-impl<T: 'static + Clone> ShellHandler<T> {
-    pub fn new(widget: AppHolder<T>) -> Self {
+impl ShellHandler {
+    pub fn new(widget: AppHolder) -> Self {
         ShellHandler {
             inner: WindowConnection::Waiting(widget),
         }
@@ -61,7 +61,7 @@ impl<T: 'static + Clone> ShellHandler<T> {
     //}
     //}
 
-    fn with_window_mut<R>(&mut self, f: impl FnOnce(&mut Window<T>) -> R) -> Option<R> {
+    fn with_window_mut<R>(&mut self, f: impl FnOnce(&mut Window) -> R) -> Option<R> {
         match &mut self.inner {
             WindowConnection::Connected(window) => {
                 let r = Some(f(&mut *window.borrow_mut()));
@@ -76,7 +76,7 @@ impl<T: 'static + Clone> ShellHandler<T> {
     }
 }
 
-impl<T: 'static + Clone> WinHandler for ShellHandler<T> {
+impl WinHandler for ShellHandler {
     fn connect(&mut self, handle: &WindowHandle) {
         self.inner = match self.inner.transition() {
             WindowConnection::Waiting(app) => {

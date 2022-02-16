@@ -1,7 +1,15 @@
+use std::any::Any;
+
 use crate::{
     core::{AnyView, AnyWidget},
     widget_host::WidgetHost,
 };
+
+pub trait AppDyn {
+    fn update_first(&mut self, msg: &dyn Any);
+    fn update_second(&mut self, msg: Box<dyn Any>);
+    fn view<'a>(&'a self) -> AnyView<'a>;
+}
 
 pub trait Application {
     type Action;
@@ -9,17 +17,41 @@ pub trait Application {
     fn view<'a>(&'a self) -> AnyView<'a>;
 }
 
-pub struct AppHolder<T> {
-    current: Box<dyn Application<Action = T>>,
-    next: Box<dyn Application<Action = T>>,
+impl<Msg, A> AppDyn for A
+where
+    A: Application<Action = Msg>,
+    Msg: Clone + 'static,
+{
+    fn update_first(&mut self, msg: &dyn Any) {
+        match msg.downcast_ref::<Msg>() {
+            Some(msg) => self.update(msg.clone()),
+            None => eprintln!("Unknown Message: {:?}", msg),
+        }
+    }
+
+    fn update_second(&mut self, msg: Box<dyn Any>) {
+        match msg.downcast::<Msg>() {
+            Ok(msg) => self.update(*msg),
+            Err(msg) => eprintln!("Unknown Message: {:?}", msg),
+        }
+    }
+
+    fn view<'a>(&'a self) -> AnyView<'a> {
+        self.view()
+    }
+}
+
+pub struct AppHolder {
+    current: Box<dyn AppDyn>,
+    next: Box<dyn AppDyn>,
     // borrows from current
     host: WidgetHost<'static>,
 }
 
-impl<T: Clone> AppHolder<T> {
+impl AppHolder {
     pub fn new<A>(left: A, right: A) -> Self
     where
-        A: Application<Action = T> + 'static,
+        A: AppDyn + 'static,
     {
         let current = Box::new(left);
         let next = Box::new(right);
@@ -39,15 +71,15 @@ impl<T: Clone> AppHolder<T> {
         f(&mut self.host)
     }
 
-    pub fn update(&mut self, msg: T) {
+    pub fn update(&mut self, msg: Box<dyn Any>) {
         take_mut::take(self, |mut this| {
             let mut current = this.current;
             let mut next = this.next;
-            next.update(msg.clone());
+            next.update_first(&msg);
             let next_view =
                 unsafe { std::mem::transmute::<AnyView<'_>, AnyView<'static>>(next.view()) };
             this.host = this.host.update(next_view);
-            current.update(msg);
+            current.update_second(msg);
             this.current = next;
             this.next = current;
             this

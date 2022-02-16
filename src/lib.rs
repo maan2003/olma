@@ -1,5 +1,5 @@
 #![feature(generic_associated_types)]
-#![allow(clippy::needless_lifetimes)]
+#![allow(clippy::needless_lifetimes, dead_code)]
 
 mod box_constraints;
 mod contexts;
@@ -17,7 +17,7 @@ pub mod widgets;
 mod ui_widgets;
 mod window;
 
-pub use app::Application;
+pub use app::{Application, AppDyn};
 pub use box_constraints::BoxConstraints;
 pub use contexts::{EventCtx, LayoutCtx, PaintCtx};
 pub use launch::launch;

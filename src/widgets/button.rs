@@ -19,7 +19,7 @@ impl<'a> Button<'a> {
         }
     }
 
-    pub fn on_click(mut self, f: fn() -> Box<dyn Any>) -> Self {
+    pub fn click(mut self, f: fn() -> Box<dyn Any>) -> Self {
         self.on_click = Some(f);
         self
     }

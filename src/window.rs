@@ -11,15 +11,15 @@ use crate::widgets::layout::LayoutState;
 use crate::{BoxConstraints, EventCtx, LayoutCtx, PaintCtx, UiWidget};
 use druid_shell::{IdleToken, KeyEvent, MouseEvent, Region, TimerToken, WindowHandle};
 
-pub struct Window<T> {
+pub struct Window {
     handle: WindowHandle,
     root_state: WidgetState,
     layout_state: LayoutState,
-    app: AppHolder<T>,
+    app: AppHolder,
     pub(crate) messages: Vec<Box<dyn Any>>,
 }
 
-impl<T: 'static + Clone> Window<T> {
+impl Window {
     fn with_event_ctx<R>(&mut self, f: impl FnOnce(&mut WidgetHost, &mut EventCtx) -> R) -> R {
         let mut ctx = EventCtx {
             window: &self.handle,
@@ -36,7 +36,7 @@ impl<T: 'static + Clone> Window<T> {
         self.app.with_host(|w| f(w, &mut ctx))
     }
 
-    pub fn new(handle: WindowHandle, app: AppHolder<T>) -> Self {
+    pub fn new(handle: WindowHandle, app: AppHolder) -> Self {
         Window {
             handle,
             app,
@@ -48,12 +48,7 @@ impl<T: 'static + Clone> Window<T> {
 
     pub fn update(&mut self) {
         for msg in mem::take(&mut self.messages) {
-            match msg.downcast::<T>() {
-                Ok(msg) => self.app.update(*msg),
-                Err(err) => {
-                    eprintln!("{:?}", err);
-                }
-            }
+            self.app.update(msg);
         }
     }
 

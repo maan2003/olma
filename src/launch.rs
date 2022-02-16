@@ -1,14 +1,18 @@
 use crate::app::{self, AppHolder};
+use crate::core::View;
 use crate::kurbo::Size;
 
 use druid_shell::{Application, Error as PlatformError, WindowBuilder};
 
 use crate::shell_handler::ShellHandler;
 
-pub fn launch<Msg, A>(app: A, app2: A) -> Result<(), PlatformError>
+pub fn launch<D, Msg, U, V, VV>(d1: D, d2: D, update: U, view: V) -> Result<(), PlatformError>
 where
     Msg: 'static + Clone,
-    A: app::Application<Action = Msg> + 'static,
+    D: 'static,
+    U: 'static + Fn(&mut D, Msg),
+    V: 'static + for<'a> Fn(&'a D) -> V<'a>,
+    V: for<'a> View<'a>
 {
     let application = Application::new()?;
     let holder = AppHolder::new(app, app2);
