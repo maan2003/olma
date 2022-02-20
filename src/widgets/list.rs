@@ -1,67 +1,62 @@
-use crate::{core::*, widget_host::WidgetHost};
+use crate::{core::*, vbox_dyn, view_bump::VBox, widget_host::WidgetHost};
 
-use std::{any::TypeId, marker::PhantomData};
+use std::any::TypeId;
 
 use super::layout::stack::{Stack, Vertical};
 
-pub struct List<'a, T> {
-    list: &'a [T],
-    child: Box<dyn Fn(&T) -> AnyView<'a> + 'a>,
+pub struct List<'a> {
+    iter: VBox<'a, dyn Iterator<Item = AnyView<'a>> + 'a>,
 }
 
-impl<'a, T> List<'a, T> {
-    pub fn new(list: &'a [T], child: Box<dyn Fn(&T) -> AnyView<'a> + 'a>) -> Self {
-        Self { list, child }
+impl<'a> List<'a> {
+    pub fn new<I>(children: I) -> Self
+    where
+        I: IntoIterator + 'a,
+        I::Item: View<'a>,
+    {
+        let children = children.into_iter().map(AnyView::new);
+        List {
+            iter: vbox_dyn!(children, dyn Iterator<Item = AnyView<'a>> + 'a),
+        }
     }
 }
 
-struct ListWidget<T> {
+struct ListWidget {
     ui: Stack,
-    _type: PhantomData<T>,
 }
 
-impl<'a, T> CustomView<'a> for List<'a, T>
-where
-    T: 'static,
-{
+impl<'a> CustomView<'a> for List<'a> {
     fn type_id(&self) -> TypeId {
-        todo!()
+        TypeId::of::<List<'static>>()
     }
 
-    fn build(self) -> Box<dyn Widget> {
-        let items = self
-            .list
-            .iter()
-            .map(|item| WidgetHost::new((self.child)(item).build()))
+    fn build(mut self) -> Box<dyn Widget> {
+        let items = (&mut *self.iter)
+            .map(|w| WidgetHost::new(w.build()))
             .collect();
 
-        Box::new(ListWidget::<T> {
+        Box::new(ListWidget {
             ui: Stack {
                 children: items,
                 axis: &Vertical,
             },
-            _type: PhantomData,
         })
     }
 }
 
-impl<T> CustomWidget for ListWidget<T>
-where
-    T: 'static,
-{
-    type View<'t> = List<'t, T>;
+impl CustomWidget for ListWidget {
+    type View<'t> = List<'t>;
 
-    fn update<'a>(&mut self, view: Self::View<'a>) {
-        self.ui.children.truncate(view.list.len());
-        let mut it = view.list.iter();
-        for child in &mut self.ui.children {
-            let view = (view.child)(it.next().unwrap());
+    fn update<'a>(&mut self, mut view: Self::View<'a>) {
+        let mut cnt = 0;
+        for (view, child) in (&mut *view.iter).zip(self.ui.children.iter_mut()) {
             child.update(view);
+            cnt += 1;
         }
-        for elems in it {
-            let view = (view.child)(elems);
-            let widget = view.build();
-            self.ui.children.push(WidgetHost::new(widget));
+
+        self.ui.children.truncate(cnt);
+        for child in &mut *view.iter {
+            self.ui.children.push(WidgetHost::new(child.build()));
         }
     }
 

@@ -5,6 +5,14 @@ use crate::widget_host::WidgetHost;
 
 use std::any::TypeId;
 
+pub fn Column<'a>() -> Stack<'a> {
+    Stack::column()
+}
+
+pub fn Row<'a>() -> Stack<'a> {
+    Stack::row()
+}
+
 pub struct Stack<'a> {
     children: VVec<'a, AnyView<'a>>,
     axis: &'static dyn ui::Axis,

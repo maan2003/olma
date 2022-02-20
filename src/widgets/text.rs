@@ -14,6 +14,10 @@ impl<'a> Text<'a> {
     }
 }
 
+pub fn Text<'a>(text: impl Into<Cow<'a, str>>) -> Text<'a> {
+    Text::new(text)
+}
+
 pub struct TextWidget {
     ui: ui::Text,
 }

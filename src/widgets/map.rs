@@ -7,7 +7,7 @@ use druid_shell::{KeyEvent, TimerToken};
 
 use crate::{core::*, widget::SingleChildContainer, EventCtx, MouseEvent, UiWidget};
 
-struct Map<'a, T, U> {
+pub struct Map<'a, T, U> {
     map: fn(T) -> U,
     passthru: bool,
     inner: AnyView<'a>,

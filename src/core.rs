@@ -5,7 +5,9 @@ use std::ptr;
 use druid_shell::kurbo::Size;
 use druid_shell::{KeyEvent, TimerToken};
 
-use crate::{BoxConstraints, EventCtx, LayoutCtx, MouseEvent, PaintCtx, UiWidget};
+use crate::{
+    vbox_dyn, view_bump, BoxConstraints, EventCtx, LayoutCtx, MouseEvent, PaintCtx, UiWidget,
+};
 
 // SAFETY: build must only be called once and must be treated as if it is `self`
 // caller must not drop `self`
@@ -154,7 +156,7 @@ impl UiWidget for AnyWidget {
     }
 }
 
-use crate::view_bump::{self, VBox};
+use crate::view_bump::VBox;
 
 pub struct AnyView<'a> {
     inner: VBox<'a, dyn View<'a>>,
@@ -162,11 +164,8 @@ pub struct AnyView<'a> {
 
 impl<'a> AnyView<'a> {
     pub fn new<W: View<'a>>(inner: W) -> Self {
-        let bump = view_bump::current();
-        let value = bump.alloc(inner) as &mut dyn View<'a> as *mut dyn View<'a>;
-
         AnyView {
-            inner: unsafe { VBox::from_raw(bump, value) },
+            inner: vbox_dyn!(inner, dyn View<'a>),
         }
     }
 

@@ -5,71 +5,80 @@ use bumpalo::Bump;
 pub struct B<T> {
     // borrows from the bump allocator
     val: T,
-    bump: Rc<Bump>,
+    bump: ViewBump,
 }
 
-thread_local! {
-    static BUMP: RefCell<Option<Rc<Bump>>> = RefCell::new(None);
-}
+#[derive(Clone)]
+pub struct ViewBump(Rc<Bump>);
 
-pub fn current() -> Rc<Bump> {
-    match BUMP.with(|bump| bump.borrow().clone()) {
-        Some(b) => b,
-        None => panic!("No bump allocator set"),
+impl ops::Deref for ViewBump {
+    type Target = Bump;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-pub fn new() {
-    BUMP.with(|bump| {
-        let b = &mut *bump.borrow_mut();
-        match b {
-            Some(bump) => match Rc::get_mut(bump) {
-                Some(bump) => {
-                    bump.reset();
-                }
-                None => {
-                    eprintln!("Bump allocator is not unique, allocating new bump");
-                    *b = Some(Rc::new(Bump::new()));
-                }
-            },
-            None => {
-                *b = Some(Rc::new(Bump::new()));
-            }
-        }
-    });
+thread_local! {
+    static VIEW_BUMP: RefCell<Option<ViewBump>> = RefCell::new(None);
 }
 
-pub fn with_mut<R>(f: impl FnOnce(&mut Bump) -> R) -> Option<R> {
-    BUMP.with(|bump| {
-        let b = &mut *bump.borrow_mut();
-        match b {
-            Some(bump) => match Rc::get_mut(bump) {
-                Some(bump) => Some(f(bump)),
+impl ViewBump {
+    pub fn init() {
+        VIEW_BUMP.with(|bump| {
+            let b = &mut *bump.borrow_mut();
+            match b {
+                Some(bump) => match Rc::get_mut(&mut bump.0) {
+                    Some(bump) => {
+                        bump.reset();
+                    }
+                    None => {
+                        eprintln!("Bump allocator is not unique, allocating new bump");
+                        *b = Some(ViewBump(Rc::new(Bump::new())));
+                    }
+                },
                 None => {
-                    eprintln!("Bump allocator is not unique");
-                    None
+                    *b = Some(ViewBump(Rc::new(Bump::new())));
                 }
-            },
+            }
+        });
+    }
+
+    pub fn current() -> ViewBump {
+        match VIEW_BUMP.with(|bump| bump.borrow().clone()) {
+            Some(b) => b,
             None => panic!("No bump allocator set"),
         }
-    })
-}
+    }
 
-/// Reset the bump allocator if it is unique
-pub fn reset() {
-    self::with_mut(|bump| {
-        bump.reset();
-    });
+    pub fn reset() {
+        VIEW_BUMP.with(|bump| {
+            let b = &mut *bump.borrow_mut();
+            match b {
+                Some(bump) => match Rc::get_mut(&mut bump.0) {
+                    Some(bump) => {
+                        bump.reset();
+                    }
+                    None => {
+                        eprintln!("Bump allocator is not unique, allocating new bump");
+                        *b = Some(ViewBump(Rc::new(Bump::new())));
+                    }
+                },
+                None => {
+                    *b = Some(ViewBump(Rc::new(Bump::new())));
+                }
+            }
+        });
+    }
 }
 
 impl<T> B<T> {
     pub unsafe fn from_fn(f: impl FnOnce(&'static Bump) -> T) -> Self {
-        let bump = current();
+        let bump = ViewBump::current();
         Self::from_fn_in(bump, f)
     }
 
-    pub unsafe fn from_fn_in(bump: Rc<Bump>, f: impl FnOnce(&'static Bump) -> T) -> Self {
-        let val = f(mem::transmute::<&'_ Bump, &'static Bump>(&*bump));
+    pub unsafe fn from_fn_in(bump: ViewBump, f: impl FnOnce(&'static Bump) -> T) -> Self {
+        let val = f(mem::transmute::<&'_ Bump, &'static Bump>(&*bump.0));
         B { val, bump }
     }
 
@@ -119,11 +128,24 @@ impl<'a, T: ?Sized> VBox<'a, T> {
         unsafe { B::from_fn(move |bump| bumpalo::boxed::Box::new_in(value, bump)) }
     }
 
-    pub unsafe fn from_raw(bump: Rc<Bump>, ptr: *mut T) -> Self {
-        B::from_fn_in(bump, move |bump| bumpalo::boxed::Box::from_raw(ptr))
+    pub unsafe fn from_raw(bump: ViewBump, ptr: *mut T) -> Self {
+        B::from_fn_in(bump, move |_bump| bumpalo::boxed::Box::from_raw(ptr))
     }
 
-    pub fn into_raw(this: Self) -> (Rc<Bump>, *mut T) {
+    pub fn into_raw(this: Self) -> (ViewBump, *mut T) {
         (this.bump, bumpalo::boxed::Box::into_raw(this.val))
     }
+}
+
+#[macro_export]
+macro_rules! vbox_dyn {
+    ($v:expr, $t:ty) => {
+        match $v {
+            v => {
+                let bump = $crate::view_bump::ViewBump::current();
+                let value = bump.alloc(v) as &mut $t as *mut $t;
+                unsafe { $crate::view_bump::VBox::from_raw(bump, value) }
+            }
+        }
+    };
 }
