@@ -1,73 +1,243 @@
+#![feature(type_alias_impl_trait, generic_associated_types)]
 #![allow(clippy::needless_lifetimes)]
 
-use std::fmt::Arguments;
-
-use olma::core::{AnyView, View};
+use olma::core::View;
+use olma::piet::Color;
 use olma::widgets::button::Button;
-use olma::widgets::text::{self, Text};
-use olma::{AppDyn, Application};
+use olma::widgets::list::List;
+use olma::widgets::stack::Stack;
+use olma::widgets::text::Text;
+use olma::{Application, ViewExt};
 
-struct App {
-    num: i32,
+macro_rules! view_body_list {
+    (
+        (:view $view:ident)
+        (:current $($curr:tt)*)
+        , $($rest:tt)*
+    ) => {{
+        $view = $view.child(
+            view! {
+                $($curr)*
+            }
+        );
+        view_body_list! {
+            (:view $view)
+            (:current )
+            $($rest)*
+        }
+    }};
+    (
+        (:view $view:ident)
+        (:current $($curr:tt)*)
+        $tok:tt $($rest:tt)*
+    ) => {
+        view_body_list! {
+            (:view $view)
+            (:current $($curr)* $tok)
+            $($rest)*
+        }
+    };
+    (
+        (:view $view:ident)
+        (:current)
+    ) => {};
+
+    (
+        (:view $view:ident)
+        (:current $($curr:tt)*)
+    ) => {
+        $view = $view.child({
+            view! {
+                $($curr)*
+            }
+        });
+    }
+}
+
+macro_rules! view_body_fields {
+    (
+        (:view $view:ident)
+        // todo: not use expr here
+        $f:ident : $v:expr,
+        $($rest:tt)*
+    ) => {{
+        $view = $view.$f($v);
+        view_body_fields! {
+            (:view $view)
+            $($rest)*
+        }
+    }};
+    (
+        (:view $view:ident)
+        // todo: not use expr here
+        $f:ident => $v:expr,
+        $($rest:tt)*
+    ) => {{
+        $view = $view.$f(|| Box::new($v) as Box<dyn std::any::Any>);
+        view_body_fields! {
+            (:view $view)
+            $($rest)*
+        }
+    }};
+    (
+        (:view $view:ident)
+        // all done
+    ) => {};
+}
+
+macro_rules! view_args {
+    ((:func $f:path)
+     (:parsed $($parsed:tt)*)
+     (:current $($curr:tt)*)
+     , $($rest:tt)*) => {
+         view_args! {
+             (:func $f)
+             (:parsed $($parsed)* view! { $($curr)* },)
+             (:current )
+             $($rest)*
+         }
+     };
+    ((:func $f:path)
+     (:parsed $($parsed:tt)*)
+     (:current $($curr:tt)*)
+     $tok:tt $($rest:tt)*) => {
+        view_args! {
+            (:func $f)
+            (:parsed $($parsed)* )
+            (:current $($curr)* $tok)
+            $($rest)*
+        }
+    };
+    ((:func $f:path)
+     (:parsed $($parsed:tt)*)
+     (:current $($curr:tt)*)
+     ) => {
+         $f($($parsed)* view! { $($curr)* },)
+    };
+
+    ((:func $f:path)
+     (:parsed $($parsed:tt)*)
+     (:current )
+     ) => {
+         $f($($parsed)*)
+    };
 }
 
 macro_rules! view_body {
-    (($v:ident)  on $event:ident : $f:expr, $($rest:tt)*) => {{
-        $v = $v.$event(|| Box::new($f) as Box<dyn std::any::Any>);
-        view_body! {
-            ($v) $($rest)*
+    (
+        (:view $view:ident)
+        $name:ident =>
+        $($rest:tt)*
+    ) => {
+        view_body_fields! {
+            (:view $view)
+            $name => $($rest)*
         }
-    }};
+    };
+    (
+        (:view $view:ident)
+        $name:ident :
+        $($rest:tt)*
+    ) => {
+        view_body_fields! {
+            (:view $view)
+            $name : $($rest)*
+        }
+    };
 
-    (($v:ident) $feild:ident : $val:expr, $($rest:tt)*) => {{
-        $v.$feild(view! {$val});
-        view_body! {
-            ($v) $($rest)*
+    (
+        (:view $view:ident)
+        $($rest:tt)*
+    ) => {
+        view_body_list! {
+            (:view $view)
+            (:current )
+            $($rest)*
         }
-    }};
-    (($v:ident)) => {}
+    }
 }
 
 macro_rules! view {
-    (
-        $ty:ident ($($arg:expr),* $(,)?) $({
-            $($body:tt)*
-        })?
-        $(where $($bind:ident = $val:expr;)*)?
+    (for ($var:ident in $list:expr) {
+        $($body:tt)*
+    }) => {
+        List::new($list, Box::new(|$var| {
+            olma::core::AnyView::new(view! {
+                $($body)*
+            })
+        }))
+    };
+
+    ($name:ident $(($($args:tt)*))?
+        $({ $($rest:tt)* })?
+        $(.$($calls:tt)*)?
     ) => {
-        AnyView::new({
-            $($(let $bind = $val;)*)?
-            #[allow(unused)]
-            let mut view = $ty::new($(view!{$arg}),*);
-            view_body! {
-                (view)
-                $($($body)*)?
-            }
-            view
-        })
+        view! {
+            $name::new $(($($args)*))?
+            $({ $($rest)* })?
+            $(.$($calls)*)?
+        }
     };
-    ($fmt:literal) => {
-        format!($fmt)
+
+    ($($name:ident)::+ $(($($args:tt)*))?
+        $({ $($rest:tt)* })?
+        $(.$($calls:tt)*)?
+    ) => {{
+        #[allow(unused_mut)]
+        let mut view = view_args! {
+            (:func $($name)::+)
+            (:parsed )
+            (:current )
+            $($($args)*)?
+        };
+        $(view_body! {
+            (:view view)
+            $($rest)*
+        })?
+        view$(.$($calls)*)?
+    }};
+
+    (f $s:literal) => {
+        format!($s)
     };
-    ($other:expr) => { $other }
+
+    ($($tt:tt)*) => {
+        $($tt)*
+    }
 }
 
-#[derive(Clone, Copy)]
+struct App {
+    num: i32,
+    list: Vec<i32>,
+}
+
 enum Msg {
-    Increment,
+    Add,
+    Remove,
 }
 
 impl Application for App {
-    type Action = Msg;
+    type Msg = Msg;
+    type View<'a> = impl View<'a>;
 
-    fn update(&mut self, msg: Self::Action) {
+    fn update(&mut self, msg: Self::Msg) {
         match msg {
-            Msg::Increment => self.num += 1,
+            Msg::Add => {
+                self.num += 1;
+                self.list.push(self.num);
+            }
+            Msg::Remove => {
+                self.list.pop();
+            }
         }
     }
 
-    fn view<'a>(&'a self) -> impl View<'a> {
-        Text::new(format!("Hello world"))
+    fn view<'a>(&'a self) -> Self::View<'a> {
+        view! {
+            for (num in &self.list) {
+                Text(f "Hello, {num}!")
+            }
+        }
     }
 }
 
