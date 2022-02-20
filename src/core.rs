@@ -98,14 +98,13 @@ impl AnyWidget {
         }
     }
 
-    pub fn update<'b>(&mut self, view: AnyView<'b>) {
-        let raw: *mut dyn View<'b> = Box::into_raw(view.inner);
+    pub fn update<'b>(&mut self, mut view: AnyView<'b>) {
         unsafe {
             // FIXME
-            self.inner.update(mem::transmute(raw));
-            // only the drop the allocated memory
-            drop(Box::from_raw(raw as *mut ManuallyDrop<dyn View<'b>>));
+            self.inner
+                .update(mem::transmute(&mut **view.inner as *mut dyn View<'b>));
         }
+        VBox::forget(view.inner);
     }
 
     pub fn view_type_id(&self) -> TypeId {
@@ -155,25 +154,26 @@ impl UiWidget for AnyWidget {
     }
 }
 
+use crate::view_bump::{self, VBox};
+
 pub struct AnyView<'a> {
-    inner: Box<dyn View<'a>>,
+    inner: VBox<'a, dyn View<'a>>,
 }
 
 impl<'a> AnyView<'a> {
     pub fn new<W: View<'a>>(inner: W) -> Self {
+        let bump = view_bump::current();
+        let value = bump.alloc(inner) as &mut dyn View<'a> as *mut dyn View<'a>;
+
         AnyView {
-            inner: Box::new(inner),
+            inner: unsafe { VBox::from_raw(bump, value) },
         }
     }
 
     pub fn build(mut self) -> AnyWidget {
         let widget = self.inner.build();
-        let ptr = Box::into_raw(self.inner);
-        unsafe {
-            // only drop the allocated memory
-            // the build call will drop the view
-            let _ = Box::from_raw(ptr as *mut ManuallyDrop<dyn View<'a>>);
-        }
+        // not drop the View
+        VBox::forget(self.inner);
         AnyWidget { inner: widget }
     }
 

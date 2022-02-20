@@ -2,6 +2,7 @@
 #![allow(clippy::needless_lifetimes, dead_code)]
 
 mod box_constraints;
+mod view_bump;
 mod contexts;
 mod launch;
 mod mouse;

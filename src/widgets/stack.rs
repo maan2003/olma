@@ -1,25 +1,26 @@
 use super::layout::stack as ui;
 use crate::core::*;
+use crate::view_bump::VVec;
 use crate::widget_host::WidgetHost;
 
 use std::any::TypeId;
 
 pub struct Stack<'a> {
-    children: Vec<AnyView<'a>>,
+    children: VVec<'a, AnyView<'a>>,
     axis: &'static dyn ui::Axis,
 }
 
 impl<'a> Stack<'a> {
     pub fn column() -> Stack<'a> {
         Stack {
-            children: Vec::new(),
+            children: VVec::new(),
             axis: &ui::Vertical,
         }
     }
 
     pub fn row() -> Stack<'a> {
         Stack {
-            children: Vec::new(),
+            children: VVec::new(),
             axis: &ui::Horizontal,
         }
     }

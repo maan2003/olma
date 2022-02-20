@@ -1,6 +1,7 @@
 use std::any::Any;
 
 use crate::{
+    view_bump,
     core::{AnyView, View},
     widget_host::WidgetHost,
 };
@@ -41,7 +42,9 @@ pub struct AppHolder {
 
 impl AppHolder {
     pub fn new(app: Box<dyn AppDyn>) -> Self {
+        view_bump::new();
         let widget = app.view().build();
+        view_bump::reset();
         let host = WidgetHost::new(widget);
 
         Self { app, host }
@@ -53,7 +56,9 @@ impl AppHolder {
 
     pub fn update(&mut self, msg: Box<dyn Any>) {
         self.app.update(msg);
+        view_bump::new();
         let next_view = self.app.view();
         self.host.update(next_view);
+        view_bump::reset();
     }
 }
