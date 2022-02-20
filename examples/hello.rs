@@ -3,10 +3,7 @@
 
 use olma::core::View;
 use olma::piet::Color;
-use olma::widgets::button::Button;
-use olma::widgets::list::List;
-use olma::widgets::stack::Stack;
-use olma::widgets::text::Text;
+use olma::widgets::*;
 use olma::{Application, ViewExt};
 
 macro_rules! view_body_list {
@@ -110,16 +107,16 @@ macro_rules! view_args {
     };
     ((:func $f:path)
      (:parsed $($parsed:tt)*)
-     (:current $($curr:tt)*)
+     (:current )
      ) => {
-         $f($($parsed)* view! { $($curr)* },)
+         $f($($parsed)*)
     };
 
     ((:func $f:path)
      (:parsed $($parsed:tt)*)
-     (:current )
+     (:current $($curr:tt)*)
      ) => {
-         $f($($parsed)*)
+         $f($($parsed)* view! { $($curr)* },)
     };
 }
 
@@ -147,6 +144,17 @@ macro_rules! view_body {
 
     (
         (:view $view:ident)
+        $name:pat in $($rest:tt)*
+    ) => {
+        let $view = $view.bind_child(|$name| {
+            ::olma::core::AnyView::new(view! {
+                $($rest)*
+            })
+        });
+    };
+
+    (
+        (:view $view:ident)
         $($rest:tt)*
     ) => {
         view_body_list! {
@@ -160,23 +168,14 @@ macro_rules! view_body {
 macro_rules! view {
     (for ($var:ident in $list:expr) {
         $($body:tt)*
-    }) => {
+    }$(.$($calls:tt)*)?
+    ) => {
         List::new($list, Box::new(|$var| {
             olma::core::AnyView::new(view! {
                 $($body)*
             })
         }))
-    };
-
-    ($name:ident $(($($args:tt)*))?
-        $({ $($rest:tt)* })?
-        $(.$($calls:tt)*)?
-    ) => {
-        view! {
-            $name::new $(($($args)*))?
-            $({ $($rest)* })?
-            $(.$($calls)*)?
-        }
+        $(.$($calls)*)?
     };
 
     ($($name:ident)::+ $(($($args:tt)*))?
@@ -231,11 +230,10 @@ impl Application for App {
             }
         }
     }
-
     fn view<'a>(&'a self) -> Self::View<'a> {
         view! {
-            for (num in &self.list) {
-                Text(f "Hello, {num}!")
+            List(&self.list) { num in
+                Text(f"{num}")
             }
         }
     }
