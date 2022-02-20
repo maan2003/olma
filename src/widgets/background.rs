@@ -14,33 +14,42 @@
 
 //! A widget that provides simple visual styling options to a child.
 
+use std::any::TypeId;
+
 use super::layout::LayoutHost;
+use crate::core::{AnyView, CustomView, CustomWidget, View};
 use crate::kurbo::{Point, Size};
 use crate::piet::{Color, RenderContext};
 use crate::widget::SingleChildContainer;
-use crate::{BoxConstraints, LayoutCtx, PaintCtx, Widget};
+use crate::{BoxConstraints, LayoutCtx, PaintCtx, UiWidget};
 
 struct BorderStyle {
     width: f64,
     color: Color,
 }
 
-/// A widget that provides simple visual styling options to a child.
-pub struct Background<W> {
+pub struct Background<'a> {
     background: Option<Color>,
     border: Option<BorderStyle>,
     corner_radius: f64,
-    inner: LayoutHost<W>,
+    inner: AnyView<'a>,
+}
+/// A widget that provides simple visual styling options to a child.
+struct BackgroundWidget {
+    background: Option<Color>,
+    border: Option<BorderStyle>,
+    corner_radius: f64,
+    inner: LayoutHost,
 }
 
-impl<W> Background<W> {
+impl<'a> Background<'a> {
     /// Create Container with a child
-    pub fn new(inner: W) -> Self {
+    pub fn new(inner: impl View<'a>) -> Self {
         Self {
             background: None,
             border: None,
-            corner_radius: 0.0.into(),
-            inner: LayoutHost::new(inner),
+            corner_radius: 0.0,
+            inner: AnyView::new(inner),
         }
     }
 
@@ -63,8 +72,38 @@ impl<W> Background<W> {
     }
 }
 
-impl<W: Widget> SingleChildContainer for Background<W> {
-    type Child = LayoutHost<W>;
+impl<'a> CustomView<'a> for Background<'a> {
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Background<'static>>()
+    }
+
+    fn build(self) -> Box<dyn crate::core::Widget> {
+        Box::new(BackgroundWidget {
+            background: self.background,
+            border: self.border,
+            corner_radius: self.corner_radius,
+            inner: LayoutHost::new(self.inner.build()),
+        })
+    }
+}
+
+impl CustomWidget for BackgroundWidget {
+    type View<'t> = Background<'t>;
+
+    fn update<'a>(&mut self, view: Self::View<'a>) {
+        self.background = view.background;
+        self.border = view.border;
+        self.corner_radius = view.corner_radius;
+        self.inner.update(view.inner);
+    }
+
+    fn as_ui_widget(&mut self) -> &mut dyn UiWidget {
+        self
+    }
+}
+
+impl SingleChildContainer for BackgroundWidget {
+    type Child = LayoutHost;
 
     fn widget(&self) -> &Self::Child {
         &self.inner

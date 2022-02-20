@@ -14,24 +14,16 @@
 
 //! A widget that arranges its children in a one-dimensional array.
 
-use crate::core::AnyWidget;
 use crate::kurbo::{common::FloatExt, Point, Rect, Size};
 use crate::widget_host::WidgetHost;
 use crate::{BoxConstraints, EventCtx, LayoutCtx, MouseEvent, PaintCtx, UiWidget};
 use druid_shell::{KeyEvent, TimerToken};
 
 /// A container with either horizontal or vertical layout.
-#[derive(Default)]
-pub struct Stack<'a, T: Axis> {
-    pub(crate) children: Vec<WidgetHost<'a>>,
-    axis: T,
+pub struct Stack {
+    pub(crate) children: Vec<WidgetHost>,
+    pub(crate) axis: &'static dyn Axis,
 }
-
-/// A horizontal collection of widgets.
-pub type Row<'a> = Stack<'a, Horizontal>;
-
-/// A vertical collection of widgets.
-pub type Column<'a> = Stack<'a, Vertical>;
 
 /// An axis in visual space.
 ///
@@ -39,9 +31,7 @@ pub type Column<'a> = Stack<'a, Vertical>;
 /// the direction in which they grow as their number of children increases.
 /// Has some methods for manipulating geometry with respect to the axis.
 pub trait Axis {
-    type Cross: Axis;
-
-    fn cross(&self) -> Self::Cross;
+    fn cross(&self) -> &'static dyn Axis;
     fn major(&self, coords: Size) -> f64;
     fn minor(&self, coords: Size) -> f64 {
         self.cross().major(coords)
@@ -71,10 +61,8 @@ pub struct Horizontal;
 pub struct Vertical;
 
 impl Axis for Horizontal {
-    type Cross = Vertical;
-
-    fn cross(&self) -> Self::Cross {
-        Vertical
+    fn cross(&self) -> &'static dyn Axis {
+        &Vertical
     }
 
     fn major(&self, coords: Size) -> f64 {
@@ -102,10 +90,8 @@ impl Axis for Horizontal {
 }
 
 impl Axis for Vertical {
-    type Cross = Horizontal;
-
-    fn cross(&self) -> Self::Cross {
-        Horizontal
+    fn cross(&self) -> &'static dyn Axis {
+        &Horizontal
     }
 
     fn major(&self, coords: Size) -> f64 {
@@ -132,29 +118,7 @@ impl Axis for Vertical {
     }
 }
 
-impl<'a, T: Axis + Default> Stack<'a, T> {
-    /// Create a new collection.
-    pub fn new() -> Self {
-        Stack {
-            axis: Default::default(),
-            children: Vec::new(),
-        }
-    }
-}
-
-impl<'a, T: Axis> Stack<'a, T> {
-    /// Add a child widget.
-    ///
-    /// See also [`with_child`].
-    ///
-    /// [`with_child`]: Flex::with_child
-    pub fn add_child(&mut self, child: AnyWidget<'a>) {
-        let child = WidgetHost::new(child);
-        self.children.push(child);
-    }
-}
-
-impl<'a, T: Axis> UiWidget for Stack<'a, T> {
+impl UiWidget for Stack {
     fn init(&mut self, ctx: &mut EventCtx) {
         self.children.iter_mut().for_each(|chld| chld.init(ctx))
     }

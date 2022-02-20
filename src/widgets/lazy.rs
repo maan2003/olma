@@ -7,7 +7,7 @@ struct LazyWidget<T> {
     data: Rc<T>,
     builder: for<'a> fn(&'a T) -> AnyView<'a>,
     // has references into data
-    inner: AnyWidget<'static>,
+    inner: AnyWidget,
 }
 
 struct Lazy<T> {
@@ -20,36 +20,31 @@ impl<'a, T: 'static> CustomView<'a> for Lazy<T> {
         todo!()
     }
 
-    fn build(self) -> Box<dyn Widget<'a>> {
+    fn build(self) -> Box<dyn Widget> {
         // VIEW doesn't outline the data
         let view = unsafe { (self.builder)(&*(&*self.data as *const T)) };
-        Box::new(WidgetWrap::<LazyWidget<_>>::new(LazyWidget {
+        Box::new(LazyWidget {
             inner: view.build(),
             data: self.data,
             builder: self.builder,
-        }))
+        })
     }
 }
 
 impl<'a, T: 'static> CustomWidget for LazyWidget<T> {
     type View<'t> = Lazy<T>;
-    type This<'t> = LazyWidget<T>;
 
-    fn update<'orig, 'new>(this: Self::This<'orig>, view: Self::View<'new>) -> Self::This<'new> {
-        if Rc::ptr_eq(&this.data, &view.data) && this.builder as usize == view.builder as usize {
-            this
-        } else {
+    fn update<'new>(&mut self, view: Self::View<'new>) {
+        if !Rc::ptr_eq(&self.data, &view.data) || self.builder as usize != view.builder as usize {
             // VIEW doesn't outlive the data
             let inner_view = unsafe { (view.builder)(&*(&*view.data as *const T)) };
-            LazyWidget {
-                data: view.data,
-                builder: view.builder,
-                inner: this.inner.update(inner_view),
-            }
+            self.data = view.data;
+            self.builder = view.builder;
+            self.inner.update(inner_view);
         }
     }
 
-    fn as_ui_widget<'x, 't>(this: &'t mut Self::This<'x>) -> &'t mut (dyn crate::UiWidget + 'x) {
-        &mut this.inner
+    fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
+        &mut self.inner
     }
 }

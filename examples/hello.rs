@@ -72,5 +72,8 @@ impl Application for App {
 }
 
 fn main() {
-    olma::launch(App { num: 10 }, App { num: 10 }).unwrap();
+    olma::launch(App {
+        num: 3,
+        list: vec![1, 2, 3],
+    });
 }

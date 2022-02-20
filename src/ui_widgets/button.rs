@@ -25,14 +25,14 @@ use crate::widgets::text::Text;
 use crate::{BoxConstraints, EventCtx, LayoutCtx, MouseEvent, PaintCtx, UiWidget};
 
 /// A widget that provides simple visual styling options to a child.
-pub struct Button<'a> {
-    pub(crate) text: LayoutHost<'a>,
+pub struct Button {
+    pub(crate) text: LayoutHost,
     pub(crate) on_click: Option<fn() -> Box<dyn Any>>,
     pub(crate) hovered: bool,
 }
 
-impl<'a> Button<'a> {
-    pub fn new(text: impl Into<Cow<'a, str>>) -> Self {
+impl Button {
+    pub fn new<'a>(text: impl Into<Cow<'a, str>>) -> Self {
         Button {
             text: LayoutHost::new(AnyView::new(Text::new(text)).build()),
             //on_click: None,
@@ -47,7 +47,7 @@ impl<'a> Button<'a> {
     }
 }
 
-impl<'a> UiWidget for Button<'a> {
+impl UiWidget for Button {
     fn init(&mut self, ctx: &mut EventCtx) {
         self.text.init(ctx);
     }
@@ -72,7 +72,6 @@ impl<'a> UiWidget for Button<'a> {
             ctx.set_mouse_focus(false);
             if ctx.hovered() {
                 if let Some(c) = self.on_click {
-
                     ctx.submit_message(c());
                 }
             }

@@ -25,38 +25,31 @@ impl<'a> Button<'a> {
     }
 }
 
-pub struct ButtonWidget<'a> {
-    ui: ui::Button<'a>,
+pub struct ButtonWidget {
+    ui: ui::Button,
 }
 
 impl<'a> CustomView<'a> for Button<'a> {
     fn type_id(&self) -> TypeId {
-        TypeId::of::<ButtonWidget<'static>>()
+        TypeId::of::<ButtonWidget>()
     }
 
-    fn build(self) -> Box<dyn Widget<'a>> {
-        Box::new(WidgetWrap::<ButtonWidget>::new(ButtonWidget {
+    fn build(self) -> Box<dyn Widget> {
+        Box::new(ButtonWidget {
             ui: ui::Button::new(self.text.text).on_click(self.on_click),
-        }))
+        })
     }
 }
 
-impl<'a> CustomWidget for ButtonWidget<'a> {
+impl<'a> CustomWidget for ButtonWidget {
     type View<'t> = Button<'t>;
 
-    type This<'t> = ButtonWidget<'t>;
-
-    fn update<'orig, 'new>(this: Self::This<'orig>, view: Self::View<'new>) -> Self::This<'new> {
-        ButtonWidget {
-            ui: ui::Button {
-                text: this.ui.text.update(AnyView::new(view.text)),
-                on_click: view.on_click,
-                hovered: this.ui.hovered,
-            },
-        }
+    fn update<'view>(&mut self, view: Self::View<'view>) {
+        self.ui.text.update(AnyView::new(view.text));
+        self.ui.on_click = view.on_click;
     }
 
-    fn as_ui_widget<'b, 't>(this: &'t mut Self::This<'b>) -> &'t mut (dyn crate::UiWidget + 'b) {
-        &mut this.ui
+    fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
+        &mut self.ui
     }
 }

@@ -5,10 +5,10 @@ use crate::widget::SingleChildContainer;
 use crate::{BoxConstraints, EventCtx, LayoutCtx, MouseEvent, PaintCtx, UiWidget};
 
 /// Manages the position of a child widget.
-pub struct LayoutHost<'a> {
+pub struct LayoutHost {
     state: LayoutState,
     debug_needs_set_origin: bool,
-    pub(crate) child: AnyWidget<'a>,
+    pub(crate) child: AnyWidget,
 }
 
 /// State related to the layout of a particular widget.
@@ -19,12 +19,12 @@ pub(crate) struct LayoutState {
     pub(crate) hovered: bool,
 }
 
-impl<'a> LayoutHost<'a> {
+impl LayoutHost {
     /// Create a new `LayoutHost` for the given child.
     ///
     /// After this widget is laid out, the parent *must* call
     /// [`LayoutHost::set_origin`] in order to set the child's position.
-    pub fn new(child: AnyWidget<'a>) -> Self {
+    pub fn new(child: AnyWidget) -> Self {
         LayoutHost {
             child,
             state: LayoutState::default(),
@@ -32,12 +32,8 @@ impl<'a> LayoutHost<'a> {
         }
     }
 
-    pub fn update<'b>(self, view: AnyView<'b>) -> LayoutHost<'b> {
-        LayoutHost {
-            child: self.child.update(view),
-            state: self.state,
-            debug_needs_set_origin: self.debug_needs_set_origin,
-        }
+    pub fn update<'b>(&mut self, view: AnyView<'b>) {
+        self.child.update(view);
     }
 
     /// Set the position of the child, relative to the origin of the parent.
@@ -59,7 +55,7 @@ impl<'a> LayoutHost<'a> {
         &mut self,
         ctx: &mut EventCtx,
         event: &MouseEvent,
-        f: impl FnOnce(&mut AnyWidget<'a>, &mut EventCtx, &MouseEvent),
+        f: impl FnOnce(&mut AnyWidget, &mut EventCtx, &MouseEvent),
     ) {
         let was_hovered = self.state.hovered;
         self.state.hovered = self.contains(event);
@@ -77,8 +73,8 @@ impl<'a> LayoutHost<'a> {
     }
 }
 
-impl<'a> SingleChildContainer for LayoutHost<'a> {
-    type Child = AnyWidget<'a>;
+impl SingleChildContainer for LayoutHost {
+    type Child = AnyWidget;
 
     fn widget(&self) -> &Self::Child {
         &self.child

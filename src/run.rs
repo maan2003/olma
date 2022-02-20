@@ -2,14 +2,14 @@
 struct Model;
 #[derive(Copy, Clone)]
 struct Msg;
-struct Widget<'a>(&'a ());
+struct Widget(&'a ());
 struct View<'a>(&'a ());
 
-fn build_widget<'a>(view: View<'a>) -> Widget<'a> {
+fn build_widget<'a>(view: View<'a>) -> Widget {
     Widget(view.0)
 }
 // update the model referenced by the widget
-fn update_widget<'a, 'b>(_widget: Widget<'a>, view: View<'b>) -> Widget<'b> {
+fn update_widget<'a, 'b>(_widget: Widget, view: View<'b>) -> Widget {
     Widget(view.0)
 }
 fn update_data(_data: &mut Model, _msg: Msg) {}

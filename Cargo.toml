@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["dylib", "rlib"]
 
 [dependencies]
 bumpalo = { version = "3.9.1", features = ["collections", "boxed"] }
 take_mut = "0.2.2"
-druid-shell = { path = "/home/manmeet/src/druid/druid-shell" }
+druid-shell = { path = "/home/manmeet/src/druid/druid-shell", features = ["x11"], default-features = false }

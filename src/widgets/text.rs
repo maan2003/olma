@@ -23,29 +23,23 @@ impl<'a> CustomView<'a> for Text<'a> {
         TypeId::of::<Text<'static>>()
     }
 
-    fn build(self) -> Box<dyn Widget<'a>> {
-        Box::new(WidgetWrap::<TextWidget>::new(TextWidget {
+    fn build(self) -> Box<dyn Widget> {
+        Box::new(TextWidget {
             ui: ui::Text::new(self.text.as_ref()),
-        }))
+        })
     }
 }
 
 impl CustomWidget for TextWidget {
     type View<'t> = Text<'t>;
 
-    type This<'t> = TextWidget;
-
-    fn update<'orig, 'new>(
-        mut this: Self::This<'orig>,
-        view: Self::View<'new>,
-    ) -> Self::This<'new> {
-        if this.ui.text() != view.text {
-            this.ui.set_text(view.text.into_owned());
+    fn update<'a>(&mut self, view: Self::View<'a>) {
+        if self.ui.text() != view.text {
+            self.ui.set_text(view.text.into_owned());
         }
-        this
     }
 
-    fn as_ui_widget<'a, 't>(this: &'t mut Self::This<'a>) -> &'t mut (dyn crate::UiWidget + 'a) {
-        &mut this.ui
+    fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
+        &mut self.ui
     }
 }

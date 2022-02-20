@@ -9,8 +9,8 @@ use crate::contexts::{EventCtx, LayoutCtx, PaintCtx};
 use crate::widgets::layout::LayoutHost;
 use crate::{BoxConstraints, MouseEvent, UiWidget};
 
-pub struct WidgetHost<'a> {
-    child: LayoutHost<'a>,
+pub struct WidgetHost {
+    child: LayoutHost,
     state: WidgetState,
 }
 
@@ -43,8 +43,8 @@ impl WidgetState {
     }
 }
 
-impl<'a> WidgetHost<'a> {
-    pub fn new(child: AnyWidget<'a>) -> Self {
+impl WidgetHost {
+    pub fn new(child: AnyWidget) -> Self {
         WidgetHost {
             child: LayoutHost::new(child),
             state: Default::default(),
@@ -55,12 +55,9 @@ impl<'a> WidgetHost<'a> {
         self.child.set_origin(origin);
     }
 
-    pub fn update<'b>(self, view: AnyView<'b>) -> WidgetHost<'b> {
+    pub fn update<'b>(&mut self, view: AnyView<'b>) {
         /*if view.type_id() == self.child.child.view_type_id() {*/
-            WidgetHost {
-                child: self.child.update(view),
-                state: self.state,
-            }
+            self.child.update(view);
         /*} else {
             todo!()
         }*/
@@ -69,7 +66,7 @@ impl<'a> WidgetHost<'a> {
     fn with_child<R>(
         &mut self,
         parent_ctx: &mut EventCtx,
-        f: impl FnOnce(&mut LayoutHost<'a>, &mut EventCtx) -> R,
+        f: impl FnOnce(&mut LayoutHost, &mut EventCtx) -> R,
     ) -> R {
         self.state.child_keyboard_focus = false;
         self.state.child_mouse_focus = false;
@@ -86,7 +83,7 @@ impl<'a> WidgetHost<'a> {
     }
 }
 
-impl<'a> UiWidget for WidgetHost<'a> {
+impl UiWidget for WidgetHost {
     fn init(&mut self, ctx: &mut EventCtx) {
         self.with_child(ctx, |chld, ctx| chld.init(ctx))
     }

@@ -1,21 +1,26 @@
-use crate::core::*;
+use crate::{core::*, widget_host::WidgetHost};
 
-use std::any::TypeId;
+use std::{any::TypeId, marker::PhantomData};
 
-struct ListView<'a, T> {
+use super::layout::stack::{Stack, Vertical};
+
+pub struct List<'a, T> {
     list: &'a [T],
     child: Box<dyn Fn(&T) -> AnyView<'a> + 'a>,
 }
 
-struct List<'a, T> {
-    list: &'a [T],
-    // I surrender to the compiler, the lifetimes got too complicated
-    // I will just use heap allocation
-    child: Box<dyn Fn(&T) -> AnyView<'a> + 'a>,
-    children: Vec<AnyWidget<'a>>,
+impl<'a, T> List<'a, T> {
+    pub fn new(list: &'a [T], child: Box<dyn Fn(&T) -> AnyView<'a> + 'a>) -> Self {
+        Self { list, child }
+    }
 }
 
-impl<'a, T> CustomView<'a> for ListView<'a, T>
+struct ListWidget<T> {
+    ui: Stack,
+    _type: PhantomData<T>,
+}
+
+impl<'a, T> CustomView<'a> for List<'a, T>
 where
     T: 'static,
 {
@@ -23,51 +28,44 @@ where
         todo!()
     }
 
-    fn build(self) -> Box<dyn Widget<'a>> {
-        Box::new(WidgetWrap::<List<_>>::new(List {
-            list: self.list,
-            child: self.child,
-            children: Vec::new(),
-        }))
+    fn build(self) -> Box<dyn Widget> {
+        let items = self
+            .list
+            .iter()
+            .map(|item| WidgetHost::new((self.child)(item).build()))
+            .collect();
+
+        Box::new(ListWidget::<T> {
+            ui: Stack {
+                children: items,
+                axis: &Vertical,
+            },
+            _type: PhantomData,
+        })
     }
 }
 
-impl<'a, T> CustomWidget for List<'a, T>
+impl<T> CustomWidget for ListWidget<T>
 where
     T: 'static,
 {
-    type View<'t> = ListView<'t, T>;
-    type This<'t> = List<'t, T>;
+    type View<'t> = List<'t, T>;
 
-    fn update<'orig, 'new>(
-        mut this: Self::This<'orig>,
-        view: Self::View<'new>,
-    ) -> Self::This<'new> {
-        this.children.truncate(view.list.len());
+    fn update<'a>(&mut self, view: Self::View<'a>) {
+        self.ui.children.truncate(view.list.len());
         let mut it = view.list.iter();
-        let mut children = this
-            .children
-            .into_iter()
-            .map(|w| {
-                let view = (view.child)(it.next().unwrap());
-                w.update(view)
-            })
-            .collect::<Vec<_>>();
-
+        for child in &mut self.ui.children {
+            let view = (view.child)(it.next().unwrap());
+            child.update(view);
+        }
         for elems in it {
             let view = (view.child)(elems);
             let widget = view.build();
-            children.push(widget);
-        }
-
-        List {
-            list: view.list,
-            child: view.child,
-            children,
+            self.ui.children.push(WidgetHost::new(widget));
         }
     }
 
-    fn as_ui_widget<'x, 't>(this: &'t mut Self::This<'x>) -> &'t mut (dyn crate::UiWidget + 'x) {
-        todo!()
+    fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
+        &mut self.ui
     }
 }
