@@ -3,211 +3,13 @@
 
 use olma::core::View;
 use olma::piet::Color;
+use olma::widgets::lazy::LazyData;
 use olma::widgets::*;
 use olma::{Application, ViewExt};
 
-macro_rules! view_body_list {
-    (
-        (:view $view:ident)
-        (:current $($curr:tt)*)
-        , $($rest:tt)*
-    ) => {{
-        $view = $view.child(
-            view! {
-                $($curr)*
-            }
-        );
-        view_body_list! {
-            (:view $view)
-            (:current )
-            $($rest)*
-        }
-    }};
-    (
-        (:view $view:ident)
-        (:current $($curr:tt)*)
-        $tok:tt $($rest:tt)*
-    ) => {
-        view_body_list! {
-            (:view $view)
-            (:current $($curr)* $tok)
-            $($rest)*
-        }
-    };
-    (
-        (:view $view:ident)
-        (:current)
-    ) => {};
-
-    (
-        (:view $view:ident)
-        (:current $($curr:tt)*)
-    ) => {
-        $view = $view.child({
-            view! {
-                $($curr)*
-            }
-        });
-    }
-}
-
-macro_rules! view_body_fields {
-    (
-        (:view $view:ident)
-        // todo: not use expr here
-        $f:ident : $v:expr,
-        $($rest:tt)*
-    ) => {{
-        $view = $view.$f($v);
-        view_body_fields! {
-            (:view $view)
-            $($rest)*
-        }
-    }};
-    (
-        (:view $view:ident)
-        // todo: not use expr here
-        $f:ident => $v:expr,
-        $($rest:tt)*
-    ) => {{
-        $view = $view.$f(|| Box::new($v) as Box<dyn std::any::Any>);
-        view_body_fields! {
-            (:view $view)
-            $($rest)*
-        }
-    }};
-    (
-        (:view $view:ident)
-        // all done
-    ) => {};
-}
-
-macro_rules! view_args {
-    ((:func $f:path)
-     (:parsed $($parsed:tt)*)
-     (:current $($curr:tt)*)
-     , $($rest:tt)*) => {
-         view_args! {
-             (:func $f)
-             (:parsed $($parsed)* view! { $($curr)* },)
-             (:current )
-             $($rest)*
-         }
-     };
-    ((:func $f:path)
-     (:parsed $($parsed:tt)*)
-     (:current $($curr:tt)*)
-     $tok:tt $($rest:tt)*) => {
-        view_args! {
-            (:func $f)
-            (:parsed $($parsed)* )
-            (:current $($curr)* $tok)
-            $($rest)*
-        }
-    };
-    ((:func $f:path)
-     (:parsed $($parsed:tt)*)
-     (:current )
-     ) => {
-         $f($($parsed)*)
-    };
-
-    ((:func $f:path)
-     (:parsed $($parsed:tt)*)
-     (:current $($curr:tt)*)
-     ) => {
-         $f($($parsed)* view! { $($curr)* },)
-    };
-}
-
-macro_rules! view_body {
-    (
-        (:view $view:ident)
-        $name:ident =>
-        $($rest:tt)*
-    ) => {
-        view_body_fields! {
-            (:view $view)
-            $name => $($rest)*
-        }
-    };
-    (
-        (:view $view:ident)
-        $name:ident :
-        $($rest:tt)*
-    ) => {
-        view_body_fields! {
-            (:view $view)
-            $name : $($rest)*
-        }
-    };
-
-    (
-        (:view $view:ident)
-        $name:pat in $($rest:tt)*
-    ) => {
-        let $view = $view.bind_child(|$name| {
-            ::olma::core::AnyView::new(view! {
-                $($rest)*
-            })
-        });
-    };
-
-    (
-        (:view $view:ident)
-        $($rest:tt)*
-    ) => {
-        view_body_list! {
-            (:view $view)
-            (:current )
-            $($rest)*
-        }
-    }
-}
-
-macro_rules! view {
-    (for ($var:ident in $list:expr) {
-        $($body:tt)*
-    }$(.$($calls:tt)*)?
-    ) => {
-        List::new($list, Box::new(|$var| {
-            olma::core::AnyView::new(view! {
-                $($body)*
-            })
-        }))
-        $(.$($calls)*)?
-    };
-
-    ($($name:ident)::+ $(($($args:tt)*))?
-        $({ $($rest:tt)* })?
-        $(.$($calls:tt)*)?
-    ) => {{
-        #[allow(unused_mut)]
-        let mut view = view_args! {
-            (:func $($name)::+)
-            (:parsed )
-            (:current )
-            $($($args)*)?
-        };
-        $(view_body! {
-            (:view view)
-            $($rest)*
-        })?
-        view$(.$($calls)*)?
-    }};
-
-    (f $s:literal) => {
-        format!($s)
-    };
-
-    ($($tt:tt)*) => {
-        $($tt)*
-    }
-}
-
 struct App {
     num: i32,
-    list: Vec<i32>,
+    list: LazyData<Vec<i32>>,
 }
 
 enum Msg {
@@ -230,18 +32,26 @@ impl Application for App {
             }
         }
     }
+
     fn view<'a>(&'a self) -> Self::View<'a> {
-        view! {
-            List(&self.list) { num in
-                Text(f"{num}")
-            }
-        }
+        Lazy::new(&self.list, || {
+            Stack::column()
+                .child(List::new(
+                    self.list.iter().map(|i| Text::new(format!("{}", i))),
+                ))
+                .child(
+                    Stack::row()
+                        .child(Button::new("Add").click(|| Msg::Add))
+                        .child(Button::new("Remove").click(|| Msg::Remove)),
+                )
+                .background(Color::WHITE)
+        })
     }
 }
 
 fn main() {
     olma::launch(App {
         num: 3,
-        list: vec![1, 2, 3],
+        list: LazyData::new(vec![1, 2, 3]),
     });
 }
