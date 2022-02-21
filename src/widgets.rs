@@ -14,4 +14,5 @@ pub use stack::{Stack, Row, Column};
 pub use button::Button;
 pub use background::Background;
 pub use map::Map;
+pub use lazy::{Lazy, LazyData};
 pub use konst::Const;
