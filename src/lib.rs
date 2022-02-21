@@ -11,7 +11,6 @@ mod widget;
 mod app;
 mod view_ext;
 pub mod core;
-mod rc2;
 mod widget_host;
 pub mod widgets;
 mod ui_widgets;
