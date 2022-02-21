@@ -8,7 +8,15 @@ use super::text::Text;
 
 pub struct Button<'a> {
     text: Text<'a>,
-    on_click: Option<fn() -> Box<dyn Any>>,
+    // most likely a zero-sized type
+    on_click: Option<Box<dyn Fn() -> Box<dyn Any>>>,
+}
+
+pub fn Button<'a>(text: impl Into<Cow<'a, str>>) -> Button<'a> {
+    Button {
+        text: Text(text),
+        on_click: None,
+    }
 }
 
 impl<'a> Button<'a> {
@@ -19,8 +27,11 @@ impl<'a> Button<'a> {
         }
     }
 
-    pub fn click(mut self, f: fn() -> Box<dyn Any>) -> Self {
-        self.on_click = Some(f);
+    pub fn click<M>(mut self, f: impl Fn() -> M + 'static) -> Self
+    where
+        M: 'static,
+    {
+        self.on_click = Some(Box::new(move || Box::new(f())));
         self
     }
 }

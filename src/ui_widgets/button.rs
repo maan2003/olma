@@ -27,7 +27,7 @@ use crate::{BoxConstraints, EventCtx, LayoutCtx, MouseEvent, PaintCtx, UiWidget}
 /// A widget that provides simple visual styling options to a child.
 pub struct Button {
     pub(crate) text: LayoutHost,
-    pub(crate) on_click: Option<fn() -> Box<dyn Any>>,
+    pub(crate) on_click: Option<Box<dyn Fn() -> Box<dyn Any>>>,
     pub(crate) hovered: bool,
 }
 
@@ -41,7 +41,7 @@ impl Button {
         }
     }
 
-    pub fn on_click(mut self, on_click: Option<fn() -> Box<dyn Any>>) -> Self {
+    pub fn on_click(mut self, on_click: Option<Box<dyn Fn() -> Box<dyn Any>>>) -> Self {
         self.on_click = on_click;
         self
     }
@@ -71,7 +71,7 @@ impl UiWidget for Button {
             ctx.request_paint();
             ctx.set_mouse_focus(false);
             if ctx.hovered() {
-                if let Some(c) = self.on_click {
+                if let Some(c) = self.on_click.as_ref() {
                     ctx.submit_message(c());
                 }
             }
