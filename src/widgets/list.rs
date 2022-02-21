@@ -21,6 +21,14 @@ impl<'a> List<'a> {
     }
 }
 
+pub fn List<'a, I>(children: I) -> List<'a>
+where
+    I: IntoIterator + 'a,
+    I::Item: View<'a>,
+{
+    List::new(children)
+}
+
 struct ListWidget {
     ui: Stack,
 }
@@ -48,16 +56,16 @@ impl CustomWidget for ListWidget {
     type View<'t> = List<'t>;
 
     fn update<'a>(&mut self, mut view: Self::View<'a>) {
-        let mut cnt = 0;
-        for (view, child) in (&mut *view.iter).zip(self.ui.children.iter_mut()) {
-            child.update(view);
-            cnt += 1;
+        let mut idx = 0;
+        for view in &mut *view.iter {
+            if idx < self.ui.children.len() {
+                self.ui.children[idx].update(view);
+            } else {
+                self.ui.children.push(WidgetHost::new(view.build()));
+            }
+            idx += 1;
         }
-
-        self.ui.children.truncate(cnt);
-        for child in &mut *view.iter {
-            self.ui.children.push(WidgetHost::new(child.build()));
-        }
+        self.ui.children.truncate(idx);
     }
 
     fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
