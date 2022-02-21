@@ -10,4 +10,4 @@ crate-type = ["dylib", "rlib"]
 [dependencies]
 bumpalo = { version = "3.9.1", features = ["collections", "boxed"] }
 take_mut = "0.2.2"
-druid-shell = { path = "/home/manmeet/src/druid/druid-shell", features = ["x11"], default-features = false }
+druid-shell = { git = "https://github.com/linebender/druid", features = ["x11"], default-features = false }
