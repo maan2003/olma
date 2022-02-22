@@ -1,7 +1,6 @@
-#![feature(type_alias_impl_trait, generic_associated_types)]
 #![allow(clippy::needless_lifetimes)]
 
-use olma::core::View;
+use olma::core::AnyView;
 use olma::piet::Color;
 use olma::widgets::lazy::LazyData;
 use olma::widgets::*;
@@ -19,7 +18,6 @@ enum Msg {
 
 impl Application for App {
     type Msg = Msg;
-    type View<'a> = impl View<'a>;
 
     fn update(&mut self, msg: Self::Msg) {
         match msg {
@@ -33,7 +31,7 @@ impl Application for App {
         }
     }
 
-    fn view<'a>(&'a self) -> Self::View<'a> {
+    fn view<'a>(&'a self) -> AnyView<'a> {
         Lazy::new(&self.list, || {
             Stack::column()
                 .child(List::new(
@@ -46,6 +44,7 @@ impl Application for App {
                 )
                 .background(Color::WHITE)
         })
+        .any()
     }
 }
 

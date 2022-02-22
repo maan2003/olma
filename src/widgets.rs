@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 pub mod layout;
 pub mod lazy;
 pub mod list;

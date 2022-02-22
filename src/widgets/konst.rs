@@ -1,6 +1,4 @@
-use std::any::TypeId;
-
-use crate::{core::*, vbox_dyn, view_bump::VBox};
+use crate::{core::*, vbox_dyn, view_bump::VBox, UiWidget};
 
 /// Does not propogate updates down the tree.
 pub struct Const<'a> {
@@ -16,30 +14,25 @@ where
     }
 }
 
-struct ConstWidget {
+pub struct ConstWidget {
     inner: AnyWidget,
 }
 
-impl<'a> CustomView<'a> for Const<'a> {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Const<'static>>()
+impl<'a> View<'a> for Const<'a> {
+    type Widget = ConstWidget;
+    fn build(self) -> Self::Widget {
+        ConstWidget {
+            inner: (self.builder)().build(),
+        }
     }
 
-    fn build(self) -> Box<dyn Widget> {
-        Box::new(ConstWidget {
-            inner: (self.builder)().build(),
-        })
+    fn update(self, _widget: &mut Self::Widget) {
+        // no-op
     }
 }
 
-impl CustomWidget for ConstWidget {
-    type View<'t> = Const<'t>;
-
-    fn update<'a>(&mut self, _view: Self::View<'a>) {
-        // no-op
-    }
-
-    fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
+impl Widget for ConstWidget {
+    fn as_ui_widget(&mut self) -> &mut dyn UiWidget {
         &mut self.inner
     }
 }

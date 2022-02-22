@@ -1,7 +1,6 @@
-use crate::core::*;
 use crate::ui_widgets::text as ui;
+use crate::{core::*, UiWidget};
 
-use std::any::TypeId;
 use std::borrow::Cow;
 
 pub struct Text<'a> {
@@ -22,28 +21,24 @@ pub struct TextWidget {
     ui: ui::Text,
 }
 
-impl<'a> CustomView<'a> for Text<'a> {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Text<'static>>()
-    }
+impl<'a> View<'a> for Text<'a> {
+    type Widget = TextWidget;
 
-    fn build(self) -> Box<dyn Widget> {
-        Box::new(TextWidget {
+    fn build(self) -> Self::Widget {
+        TextWidget {
             ui: ui::Text::new(self.text.as_ref()),
-        })
-    }
-}
-
-impl CustomWidget for TextWidget {
-    type View<'t> = Text<'t>;
-
-    fn update<'a>(&mut self, view: Self::View<'a>) {
-        if self.ui.text() != view.text {
-            self.ui.set_text(view.text.into_owned());
         }
     }
 
-    fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
+    fn update(self, widget: &mut Self::Widget) {
+        if widget.ui.text() != self.text {
+            widget.ui.set_text(self.text.into_owned());
+        }
+    }
+}
+
+impl Widget for TextWidget {
+    fn as_ui_widget(&mut self) -> &mut dyn UiWidget {
         &mut self.ui
     }
 }

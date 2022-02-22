@@ -1,10 +1,6 @@
 use std::any::Any;
 
-use crate::{
-    core::{AnyView, View},
-    view_bump::{self, ViewBump},
-    widget_host::WidgetHost,
-};
+use crate::{core::AnyView, view_bump::ViewBump, widget_host::WidgetHost};
 
 pub trait AppDyn {
     fn update(&mut self, msg: Box<dyn Any>);
@@ -13,9 +9,8 @@ pub trait AppDyn {
 
 pub trait Application: 'static {
     type Msg;
-    type View<'a>: View<'a>;
     fn update(&mut self, msg: Self::Msg);
-    fn view<'a>(&'a self) -> Self::View<'a>;
+    fn view<'a>(&'a self) -> AnyView<'a>;
 }
 
 impl<Msg, A> AppDyn for A
@@ -31,7 +26,7 @@ where
     }
 
     fn view<'a>(&'a self) -> AnyView<'a> {
-        AnyView::new(self.view())
+        self.view()
     }
 }
 

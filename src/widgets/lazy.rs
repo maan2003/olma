@@ -1,7 +1,6 @@
 use crate::view_bump::VBox;
-use crate::{core::*, vbox_dyn};
+use crate::{core::*, vbox_dyn, UiWidget};
 
-use std::any::TypeId;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -41,7 +40,7 @@ impl<T> std::ops::DerefMut for LazyData<T> {
     }
 }
 
-struct LazyWidget {
+pub struct LazyWidget {
     version: u64,
     id: u64,
     inner: AnyWidget,
@@ -53,10 +52,7 @@ pub struct Lazy<'a> {
     builder: VBox<'a, dyn Fn() -> AnyView<'a> + 'a>,
 }
 
-pub fn Lazy<'a, T, V>(
-    value: &LazyData<T>,
-    builder: impl Fn() -> V + 'a,
-) -> Lazy<'a>
+pub fn Lazy<'a, T, V>(value: &LazyData<T>, builder: impl Fn() -> V + 'a) -> Lazy<'a>
 where
     V: View<'a>,
 {
@@ -82,32 +78,28 @@ impl<'a> Lazy<'a> {
     }
 }
 
-impl<'a> CustomView<'a> for Lazy<'a> {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Lazy<'static>>()
-    }
-
-    fn build(self) -> Box<dyn Widget> {
-        Box::new(LazyWidget {
+impl<'a> View<'a> for Lazy<'a> {
+    type Widget = LazyWidget;
+    fn build(self) -> LazyWidget {
+        LazyWidget {
             id: self.id,
             version: self.version,
             inner: (self.builder)().build(),
-        })
-    }
-}
-
-impl CustomWidget for LazyWidget {
-    type View<'t> = Lazy<'t>;
-
-    fn update<'t>(&mut self, view: Self::View<'t>) {
-        if self.id != view.id || self.version != view.version {
-            self.id = view.id;
-            self.version = view.version;
-            self.inner.update((view.builder)());
         }
     }
 
-    fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
-        &mut self.inner
+    fn update(self, widget: &mut Self::Widget) {
+        if widget.id != self.id || widget.version != self.version {
+            widget.inner = (self.builder)().build();
+            widget.id = self.id;
+            widget.version = self.version;
+            widget.inner.update((self.builder)());
+        }
+    }
+}
+
+impl Widget for LazyWidget {
+    fn as_ui_widget(&mut self) -> &mut dyn UiWidget {
+        self.inner.as_ui_widget()
     }
 }

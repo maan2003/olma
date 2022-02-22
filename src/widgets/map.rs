@@ -1,83 +1,58 @@
-use std::{
-    any::{Any, TypeId},
-    mem,
-};
+use std::any::Any;
 
 use druid_shell::{KeyEvent, TimerToken};
 
 use crate::{core::*, widget::SingleChildContainer, EventCtx, MouseEvent, UiWidget};
 
-pub struct Map<'a, T, U> {
-    map: fn(T) -> U,
-    passthru: bool,
+pub struct Map<'a> {
+    map: Box<dyn Fn(Box<dyn Any>) -> Box<dyn Any>>,
     inner: AnyView<'a>,
 }
 
-struct MapWidget<T, U> {
-    map: fn(T) -> U,
-    passthru: bool,
+pub struct MapWidget {
+    map: Box<dyn Fn(Box<dyn Any>) -> Box<dyn Any>>,
     inner: AnyWidget,
 }
 
-impl<'a, T: 'static, U: 'static> CustomView<'a> for Map<'a, T, U> {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Map<'static, T, U>>()
-    }
-
-    fn build(self) -> Box<dyn Widget> {
-        Box::new(MapWidget {
-            map: self.map,
-            passthru: self.passthru,
-            inner: self.inner.build(),
-        })
+impl<'a> Map<'a> {
+    pub fn new<T, U>(_map: fn(T) -> U, _inner: AnyView) -> Self {
+        todo!()
     }
 }
 
-impl<U, T> CustomWidget for MapWidget<T, U>
-where
-    U: 'static,
-    T: 'static,
-{
-    type View<'t> = Map<'t, T, U>;
-
-    fn update<'a>(&mut self, view: Self::View<'a>) {
-        self.passthru = view.passthru;
-        self.map = view.map;
-        self.inner.update(view.inner);
+impl<'a> View<'a> for Map<'a> {
+    type Widget = MapWidget;
+    fn build(self) -> Self::Widget {
+        MapWidget {
+            map: self.map,
+            inner: self.inner.build(),
+        }
     }
 
-    fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
+    fn update(self, widget: &mut Self::Widget) {
+        widget.map = self.map;
+        self.inner.update(&mut widget.inner);
+    }
+}
+
+impl Widget for MapWidget {
+    fn as_ui_widget(&mut self) -> &mut dyn UiWidget {
         self
     }
 }
 
-impl<T: 'static, U: 'static> MapWidget<T, U> {
+impl MapWidget {
     fn check_msgs(&mut self, ctx: &mut EventCtx) {
         take_mut::take(ctx.messages, |mut msgs| {
             for msg in &mut msgs {
-                take_mut::take(msg, |msg| match msg.downcast::<T>() {
-                    Ok(msg) => Box::new((self.map)(*msg)),
-                    Err(other_msg) => {
-                        struct UnknownMsg;
-                        if self.passthru {
-                            other_msg
-                        } else {
-                            eprintln!("MapWidget: passthru is false, dropping message");
-                            Box::new(UnknownMsg)
-                        }
-                    }
-                })
+                take_mut::take(msg, |msg| (self.map)(msg));
             }
             msgs
         })
     }
 }
 
-impl<T, U> SingleChildContainer for MapWidget<T, U>
-where
-    U: 'static,
-    T: 'static,
-{
+impl SingleChildContainer for MapWidget {
     type Child = AnyWidget;
 
     fn widget(&self) -> &Self::Child {
@@ -89,34 +64,42 @@ where
     }
 
     fn init(&mut self, ctx: &mut EventCtx) {
-        self.widget_mut().init(ctx)
+        self.widget_mut().init(ctx);
+        self.check_msgs(ctx);
     }
 
     fn mouse_down(&mut self, ctx: &mut EventCtx, event: &MouseEvent) {
-        self.widget_mut().mouse_down(ctx, event)
+        self.widget_mut().mouse_down(ctx, event);
+        self.check_msgs(ctx);
     }
 
     fn mouse_up(&mut self, ctx: &mut EventCtx, event: &MouseEvent) {
-        self.widget_mut().mouse_up(ctx, event)
+        self.widget_mut().mouse_up(ctx, event);
+        self.check_msgs(ctx);
     }
 
     fn mouse_move(&mut self, ctx: &mut EventCtx, event: &MouseEvent) {
-        self.widget_mut().mouse_move(ctx, event)
+        self.widget_mut().mouse_move(ctx, event);
+        self.check_msgs(ctx);
     }
 
     fn scroll(&mut self, ctx: &mut EventCtx, event: &MouseEvent) {
-        self.widget_mut().scroll(ctx, event)
+        self.widget_mut().scroll(ctx, event);
+        self.check_msgs(ctx);
     }
 
     fn key_down(&mut self, ctx: &mut EventCtx, event: &KeyEvent) {
-        self.widget_mut().key_down(ctx, event)
+        self.widget_mut().key_down(ctx, event);
+        self.check_msgs(ctx);
     }
 
     fn key_up(&mut self, ctx: &mut EventCtx, event: &KeyEvent) {
-        self.widget_mut().key_up(ctx, event)
+        self.widget_mut().key_up(ctx, event);
+        self.check_msgs(ctx);
     }
 
     fn timer(&mut self, ctx: &mut EventCtx, token: TimerToken) {
-        self.widget_mut().timer(ctx, token)
+        self.widget_mut().timer(ctx, token);
+        self.check_msgs(ctx);
     }
 }

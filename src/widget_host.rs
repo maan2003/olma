@@ -1,5 +1,4 @@
-use std::any::Any;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 
 use crate::core::{AnyView, AnyWidget};
 use crate::kurbo::{Point, Size};
@@ -57,7 +56,7 @@ impl WidgetHost {
 
     pub fn update<'b>(&mut self, view: AnyView<'b>) {
         /*if view.type_id() == self.child.child.view_type_id() {*/
-            self.child.update(view);
+        self.child.update(view);
         /*} else {
             todo!()
         }*/

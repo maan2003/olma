@@ -1,4 +1,3 @@
-#![feature(generic_associated_types)]
 #![allow(clippy::needless_lifetimes, dead_code)]
 
 mod box_constraints;
@@ -25,5 +24,4 @@ pub use widget::UiWidget;
 pub use window::Window;
 pub use view_ext::ViewExt;
 
-use app::AppHolder;
 pub use druid_shell::{self as shell, kurbo, piet};

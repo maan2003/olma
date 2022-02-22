@@ -3,8 +3,6 @@ use crate::core::*;
 use crate::view_bump::VVec;
 use crate::widget_host::WidgetHost;
 
-use std::any::TypeId;
-
 pub fn Column<'a>() -> Stack<'a> {
     Stack::column()
 }
@@ -42,13 +40,10 @@ impl<'a> Stack<'a> {
     }
 }
 
-impl<'a> CustomView<'a> for Stack<'a> {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Stack<'static>>()
-    }
-
-    fn build(self) -> Box<dyn Widget> {
-        Box::new(StackWidget {
+impl<'a> View<'a> for Stack<'a> {
+    type Widget = StackWidget;
+    fn build(self) -> Self::Widget {
+        StackWidget {
             ui: ui::Stack {
                 children: self
                     .children
@@ -57,29 +52,27 @@ impl<'a> CustomView<'a> for Stack<'a> {
                     .collect(),
                 axis: self.axis,
             },
-        })
+        }
     }
-}
 
-struct StackWidget {
-    ui: ui::Stack,
-}
-
-impl CustomWidget for StackWidget {
-    type View<'t> = Stack<'t>;
-
-    fn update<'a>(&mut self, view: Self::View<'a>) {
-        self.ui.axis = view.axis;
-        self.ui.children.truncate(view.children.len());
-        let mut views = view.children.into_iter();
-        for child in &mut self.ui.children {
+    fn update(self, widget: &mut Self::Widget) {
+        widget.ui.axis = self.axis;
+        widget.ui.children.truncate(self.children.len());
+        let mut views = self.children.into_iter();
+        for child in &mut widget.ui.children {
             child.update(views.next().unwrap());
         }
         for child in views {
-            self.ui.children.push(WidgetHost::new(child.build()));
+            widget.ui.children.push(WidgetHost::new(child.build()));
         }
     }
+}
 
+pub struct StackWidget {
+    ui: ui::Stack,
+}
+
+impl Widget for StackWidget {
     fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
         &mut self.ui
     }

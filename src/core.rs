@@ -1,92 +1,49 @@
-use std::any::{type_name, TypeId};
-use std::mem::{self, ManuallyDrop};
-use std::ptr;
+use std::any::{Any, TypeId};
 
 use druid_shell::kurbo::Size;
 use druid_shell::{KeyEvent, TimerToken};
 
-use crate::{
-    vbox_dyn, view_bump, BoxConstraints, EventCtx, LayoutCtx, MouseEvent, PaintCtx, UiWidget,
-};
+use crate::{vbox_dyn, BoxConstraints, EventCtx, LayoutCtx, MouseEvent, PaintCtx, UiWidget};
 
-// SAFETY: build must only be called once and must be treated as if it is `self`
-// caller must not drop `self`
-pub unsafe trait View<'a>: 'a {
-    fn type_id(&self) -> TypeId;
-    fn type_name(&self) -> &'static str;
+pub trait View<'a>: 'a {
+    type Widget: Widget;
+    fn build(self) -> Self::Widget;
+    // widget is garaunteed to have same type_id as `widget_type_id`
+    fn update(self, widget: &mut Self::Widget);
+}
+
+trait DynView<'a>: 'a {
     fn build(&mut self) -> Box<dyn Widget>;
+    fn update(&mut self, widget: &mut dyn Widget);
 }
 
-// VIEW describes a widget, widget can be built from a view
-pub trait CustomView<'a>: 'a {
-    // TODO(safety): this trait should be unsafe=
-    fn type_id(&self) -> TypeId;
-    fn build(self) -> Box<dyn Widget>;
-}
+struct DynViewWrap<V>(Option<V>);
 
-pub trait CustomWidget: 'static {
-    type View<'t>: CustomView<'t>;
-    fn update<'a>(&mut self, view: Self::View<'a>);
-    fn as_ui_widget(&mut self) -> &mut dyn UiWidget;
-}
-
-/// # Safety
-///  - it should be safe to transmute the widget from 'a to 'b after call to `update`
-pub unsafe trait Widget: 'static {
-    fn view_type_id(&self) -> TypeId;
-    /// update the references in widget from 'a to 'b in the widget
-    ///
-    /// # Safety
-    ///  - caller needs to use ManuallyDrop to ensure view is not dropped by the caller
-    ///  - *mut dyn View<'b> must be treated as if it was a `dyn View<'b>`
-    unsafe fn update<'b>(&mut self, view: *mut dyn View<'b>);
-    fn as_ui_widget(&mut self) -> &mut (dyn UiWidget);
-}
-
-unsafe impl<'a, C: CustomView<'a>> View<'a> for C {
-    fn type_id(&self) -> TypeId {
-        <C as CustomView>::type_id(self)
-    }
-    fn type_name(&self) -> &'static str {
-        std::any::type_name::<C>()
-    }
-
+impl<'a, V: View<'a>> DynView<'a> for DynViewWrap<V> {
     fn build(&mut self) -> Box<dyn Widget> {
-        let this = self as *mut Self;
-        // SAFETY: caller must ensure that the view is not dropped by the caller
-        let this = unsafe { ptr::read(this) };
-        this.build()
+        Box::new(self.0.take().unwrap().build())
+    }
+
+    fn update(&mut self, widget: &mut dyn Widget) {
+        self.0
+            .take()
+            .unwrap()
+            .update(widget.as_any().downcast_mut::<V::Widget>().unwrap());
     }
 }
 
-unsafe impl<W> Widget for W
-where
-    W: CustomWidget,
-{
-    fn view_type_id(&self) -> TypeId {
-        TypeId::of::<W::View<'static>>()
-    }
+pub trait AsAny {
+    fn as_any(&mut self) -> &mut dyn Any;
+}
 
-    unsafe fn update<'a>(&mut self, view: *mut dyn View<'a>) {
-        // SAFETY: view is valid pointer
-        // FIXME: use
-        if (*view).type_name() != type_name::<W::View<'static>>() {
-            panic!(
-                "view type mismatch: expected {:?}, got {:?}",
-                type_name::<W::View<'static>>(),
-                (*view).type_name()
-            );
-        }
-        let view_ptr = view.cast::<W::View<'a>>();
-        let view = ptr::read(view_ptr);
-        // make segfaults very likely if caller tries to use view after the call to update
-        ptr::write_bytes(view_ptr, 0xaa, 1);
-        <W as CustomWidget>::update(self, view);
+impl<T: 'static> AsAny for T {
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
     }
+}
 
-    fn as_ui_widget(&mut self) -> &mut (dyn UiWidget) {
-        W::as_ui_widget(self)
-    }
+pub trait Widget: AsAny + 'static {
+    fn as_ui_widget(&mut self) -> &mut dyn UiWidget;
 }
 
 pub struct AnyWidget {
@@ -100,17 +57,41 @@ impl AnyWidget {
         }
     }
 
-    pub fn update<'b>(&mut self, mut view: AnyView<'b>) {
-        unsafe {
-            // FIXME
-            self.inner
-                .update(mem::transmute(&mut **view.inner as *mut dyn View<'b>));
-        }
-        VBox::forget(view.inner);
+    pub fn as_ui_widget(&mut self) -> &mut dyn UiWidget {
+        self.inner.as_ui_widget()
     }
 
-    pub fn view_type_id(&self) -> TypeId {
-        self.inner.view_type_id()
+    pub fn update(&mut self, view: AnyView) {
+        view.update(self);
+    }
+}
+
+use crate::view_bump::VBox;
+
+pub struct AnyView<'a> {
+    inner: VBox<'a, dyn DynView<'a>>,
+    widget_type_id: TypeId,
+}
+
+impl<'a> AnyView<'a> {
+    pub fn new<V: View<'a>>(inner: V) -> Self {
+        AnyView {
+            inner: vbox_dyn!(DynViewWrap(Some(inner)), dyn DynView<'a>),
+            widget_type_id: TypeId::of::<V::Widget>(),
+        }
+    }
+
+    pub fn build(mut self) -> AnyWidget {
+        let widget = self.inner.build();
+        AnyWidget { inner: widget }
+    }
+
+    pub fn update(mut self, widget: &mut AnyWidget) {
+        self.inner.update(&mut *widget.inner);
+    }
+
+    pub fn widget_type_id(&self) -> TypeId {
+        self.widget_type_id
     }
 }
 
@@ -153,34 +134,5 @@ impl UiWidget for AnyWidget {
 
     fn paint(&mut self, ctx: &mut PaintCtx) {
         self.inner.as_ui_widget().paint(ctx);
-    }
-}
-
-use crate::view_bump::VBox;
-
-pub struct AnyView<'a> {
-    inner: VBox<'a, dyn View<'a>>,
-}
-
-impl<'a> AnyView<'a> {
-    pub fn new<W: View<'a>>(inner: W) -> Self {
-        AnyView {
-            inner: vbox_dyn!(inner, dyn View<'a>),
-        }
-    }
-
-    pub fn build(mut self) -> AnyWidget {
-        let widget = self.inner.build();
-        // not drop the View
-        VBox::forget(self.inner);
-        AnyWidget { inner: widget }
-    }
-
-    pub fn type_id(&self) -> TypeId {
-        self.inner.type_id()
-    }
-
-    pub fn type_name(&self) -> &'static str {
-        self.inner.type_name()
     }
 }

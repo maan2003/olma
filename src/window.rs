@@ -2,7 +2,6 @@ use std::any::Any;
 use std::mem;
 
 use crate::app::AppHolder;
-use crate::core::AnyWidget;
 use crate::kurbo::{Point, Size};
 use crate::piet::Piet;
 

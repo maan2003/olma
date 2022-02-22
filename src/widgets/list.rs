@@ -1,7 +1,5 @@
 use crate::{core::*, vbox_dyn, view_bump::VBox, widget_host::WidgetHost};
 
-use std::any::TypeId;
-
 use super::layout::stack::{Stack, Vertical};
 
 pub struct List<'a> {
@@ -29,45 +27,41 @@ where
     List::new(children)
 }
 
-struct ListWidget {
+pub struct ListWidget {
     ui: Stack,
 }
 
-impl<'a> CustomView<'a> for List<'a> {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<List<'static>>()
-    }
+impl<'a> View<'a> for List<'a> {
+    type Widget = ListWidget;
 
-    fn build(mut self) -> Box<dyn Widget> {
+    fn build(mut self) -> Self::Widget {
         let items = (&mut *self.iter)
             .map(|w| WidgetHost::new(w.build()))
             .collect();
 
-        Box::new(ListWidget {
+        ListWidget {
             ui: Stack {
                 children: items,
                 axis: &Vertical,
             },
-        })
+        }
     }
-}
 
-impl CustomWidget for ListWidget {
-    type View<'t> = List<'t>;
-
-    fn update<'a>(&mut self, mut view: Self::View<'a>) {
+    fn update(mut self, widget: &mut Self::Widget) {
         let mut idx = 0;
-        for view in &mut *view.iter {
-            if idx < self.ui.children.len() {
-                self.ui.children[idx].update(view);
+        for view in &mut *self.iter {
+            if idx < widget.ui.children.len() {
+                widget.ui.children[idx].update(view);
             } else {
-                self.ui.children.push(WidgetHost::new(view.build()));
+                widget.ui.children.push(WidgetHost::new(view.build()));
             }
             idx += 1;
         }
-        self.ui.children.truncate(idx);
+        widget.ui.children.truncate(idx);
     }
+}
 
+impl Widget for ListWidget {
     fn as_ui_widget(&mut self) -> &mut dyn crate::UiWidget {
         &mut self.ui
     }

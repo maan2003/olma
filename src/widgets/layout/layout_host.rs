@@ -33,7 +33,7 @@ impl LayoutHost {
     }
 
     pub fn update<'b>(&mut self, view: AnyView<'b>) {
-        self.child.update(view);
+        view.update(&mut self.child);
     }
 
     /// Set the position of the child, relative to the origin of the parent.

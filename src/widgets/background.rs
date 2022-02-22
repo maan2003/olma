@@ -14,10 +14,8 @@
 
 //! A widget that provides simple visual styling options to a child.
 
-use std::any::TypeId;
-
 use super::layout::LayoutHost;
-use crate::core::{AnyView, CustomView, CustomWidget, View};
+use crate::core::{AnyView, View, Widget};
 use crate::kurbo::{Point, Size};
 use crate::piet::{Color, RenderContext};
 use crate::widget::SingleChildContainer;
@@ -35,7 +33,7 @@ pub struct Background<'a> {
     inner: AnyView<'a>,
 }
 /// A widget that provides simple visual styling options to a child.
-struct BackgroundWidget {
+pub struct BackgroundWidget {
     background: Option<Color>,
     border: Option<BorderStyle>,
     corner_radius: f64,
@@ -72,31 +70,27 @@ impl<'a> Background<'a> {
     }
 }
 
-impl<'a> CustomView<'a> for Background<'a> {
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Background<'static>>()
-    }
+impl<'a> View<'a> for Background<'a> {
+    type Widget = BackgroundWidget;
 
-    fn build(self) -> Box<dyn crate::core::Widget> {
-        Box::new(BackgroundWidget {
+    fn build(self) -> Self::Widget {
+        BackgroundWidget {
             background: self.background,
             border: self.border,
             corner_radius: self.corner_radius,
             inner: LayoutHost::new(self.inner.build()),
-        })
+        }
+    }
+
+    fn update(self, widget: &mut Self::Widget) {
+        widget.background = self.background;
+        widget.border = self.border;
+        widget.corner_radius = self.corner_radius;
+        widget.inner.update(self.inner);
     }
 }
 
-impl CustomWidget for BackgroundWidget {
-    type View<'t> = Background<'t>;
-
-    fn update<'a>(&mut self, view: Self::View<'a>) {
-        self.background = view.background;
-        self.border = view.border;
-        self.corner_radius = view.corner_radius;
-        self.inner.update(view.inner);
-    }
-
+impl Widget for BackgroundWidget {
     fn as_ui_widget(&mut self) -> &mut dyn UiWidget {
         self
     }
@@ -121,12 +115,10 @@ impl SingleChildContainer for BackgroundWidget {
         let origin = Point::new(border_width, border_width);
         self.inner.set_origin(origin);
 
-        let my_size = Size::new(
+        Size::new(
             size.width + 2.0 * border_width,
             size.height + 2.0 * border_width,
-        );
-
-        my_size
+        )
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx) {

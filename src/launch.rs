@@ -1,7 +1,7 @@
 use crate::kurbo::Size;
 use crate::{app::AppHolder, AppDyn};
 
-use druid_shell::{Application, Error as PlatformError, WindowBuilder};
+use druid_shell::{Application, WindowBuilder};
 
 use crate::shell_handler::ShellHandler;
 
